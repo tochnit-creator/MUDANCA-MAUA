@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador Mudança Mauá</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: faixa de tese no topo; abaixo, controles à esquerda (fixos no desktop) e resultados à direita; no celular tudo em uma coluna */
+:root{
+  --bg:#F1F2F4; --surface:#FFFFFF; --sunk:#E7E9EC; --ink:#1A1E23; --muted:#5B636D; --line:#D6DADF;
+  --accent:#E3A21A; --accent-ink:#5A3D00;
+  --sa:#B5402B; --sb:#8C6A12; --sc:#1F6E8C;
+  --good:#1E7A4F; --bad:#B5402B; --warn:#A8650A;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Roboto,Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111418; --surface:#1A1E24; --sunk:#232830; --ink:#E7E9EC; --muted:#9AA3AE; --line:#2E343C;
+  --accent:#F2B33D; --accent-ink:#2A1C00;
+  --sa:#E3765F; --sb:#D4B04F; --sc:#5DB3D4; --good:#5CC48E; --bad:#E3765F; --warn:#E9A93B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111418; --surface:#1A1E24; --sunk:#232830; --ink:#E7E9EC; --muted:#9AA3AE; --line:#2E343C;
+  --accent:#F2B33D; --accent-ink:#2A1C00;
+  --sa:#E3765F; --sb:#D4B04F; --sc:#5DB3D4; --good:#5CC48E; --bad:#E3765F; --warn:#E9A93B; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);text-transform:uppercase;letter-spacing:.02em;margin:0;text-wrap:balance;line-height:1.1}
+h1{font-size:clamp(28px,5vw,44px);font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:16px;font-weight:600;letter-spacing:.04em}
+p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* topo */
+.top{display:flex;flex-direction:column;gap:10px}
+.route{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.route b{color:var(--ink);font-weight:600}
+.route .arrow{font-family:var(--display);font-size:18px;color:var(--accent)}
+.thesis{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:4px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.thesis p.big{font-size:clamp(17px,2.2vw,21px);line-height:1.45;max-width:70ch}
+.thesis strong{font-weight:700}
+.thesis .hl-a{color:var(--sa)} .thesis .hl-c{color:var(--sc)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:600 14px/1 var(--body);padding:10px 14px;border-radius:4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.ghost{background:transparent}
+
+/* grid principal */
+.main{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.controls{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:900px){.controls{position:static;max-height:none}}
+details.group{border-top:1px solid var(--line);padding-top:12px}
+details.group:first-of-type{border-top:0;padding-top:0}
+details.group > summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.group > summary::-webkit-details-marker{display:none}
+details.group > summary::after{content:"+";font-family:var(--display);font-size:20px;color:var(--muted)}
+details.group[open] > summary::after{content:"–"}
+.fields{display:flex;flex-direction:column;gap:14px;margin-top:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.field label{font-size:14px;font-weight:600}
+.field .hint{font-size:12.5px;color:var(--muted);line-height:1.35}
+.field .ctl{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:10px;align-items:center}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+.quick button{font:600 12.5px/1 var(--body);padding:7px 10px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);cursor:pointer}
+.quick button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.quick button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.only-m{display:none}
+.dock{display:none}
+@media (max-width:900px){
+  .controls{order:2}
+  .only-m{display:inline-block}
+  body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .dock{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;position:fixed;left:0;right:0;bottom:0;z-index:20;
+    background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -4px 14px rgba(0,0,0,.08);
+    padding-top:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+.dock .d{display:flex;flex-direction:column;gap:2px;min-width:0;border-top:3px solid var(--c);padding-top:5px}
+.dock .d span{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dock .d b{font-family:var(--display);font-size:21px;font-weight:700;line-height:1.05;color:var(--c);font-variant-numeric:tabular-nums}
+.dock .d em{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--good)}
+.field input[type=text]{width:100%;font:600 15px var(--body);font-variant-numeric:tabular-nums;padding:7px 8px;border:1px solid var(--line);border-radius:4px;background:var(--sunk);color:var(--ink);text-align:right}
+details.explain{border:1px solid var(--line);border-radius:4px;background:var(--sunk)}
+details.explain summary{cursor:pointer;list-style:none;padding:8px 10px;font-size:13px;font-weight:700;color:var(--ink);display:flex;justify-content:space-between;align-items:center;gap:8px}
+details.explain summary::-webkit-details-marker{display:none}
+details.explain summary::after{content:"Abrir";font-size:12px;font-weight:600;color:var(--muted)}
+details.explain[open] summary::after{content:"Fechar"}
+details.explain summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.explain-body{padding:2px 10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.45}
+.explain-body .ex-t{font-weight:700;margin-top:4px}
+.explain-body .ex-f{font-weight:700;background:var(--surface);border:1px dashed var(--line);border-radius:4px;padding:8px 10px;text-align:center}
+.ex-tab{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-variant-numeric:tabular-nums}
+.ex-tab div{display:flex;justify-content:space-between;gap:10px}
+.ex-tab div span:last-child{font-weight:600;white-space:nowrap}
+.ex-tab .minus span:last-child{color:var(--bad)}
+.ex-tab .sum{border-top:1px solid var(--line);padding-top:6px;margin-top:2px;font-weight:700}
+.ex-tab .sum span:last-child{color:var(--good)}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px;margin:0}
+.unit{font-size:12px;color:var(--muted);font-weight:500}
+
+/* resultados */
+.results{display:flex;flex-direction:column;gap:20px;min-width:0}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--c);border-radius:4px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card .head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.card .head p{font-size:13px;color:var(--muted);margin-top:2px}
+.verdict{font:700 17px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;padding:8px 12px;border-radius:3px;white-space:nowrap;color:var(--surface)}
+.v-bom{background:var(--good)} .v-medio{background:var(--warn)} .v-ruim{background:var(--bad)}
+.reasons{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.reasons li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:9px;font-size:14px;line-height:1.38;align-items:start}
+.ic{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:700 14px/1 var(--body);color:var(--surface);margin-top:1px}
+.ic.pos{background:var(--good)} .ic.neg{background:var(--bad)}
+.card.flash{animation:flash 1s ease}
+@keyframes flash{0%{box-shadow:0 0 0 4px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+.levers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media (max-width:1100px){.levers{grid-template-columns:minmax(0,1fr)}}
+.lever{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lever .top-l{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lever label{font-size:14px;font-weight:600}
+.lever output{font-family:var(--display);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lever-row{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:10px;align-items:center}
+.step{width:40px;height:40px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--ink);font:700 20px/1 var(--body);cursor:pointer}
+.step:hover{border-color:var(--muted)}
+.step:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.card.flash{animation:none}}
+.card .total{font-family:var(--display);font-size:34px;font-weight:700;line-height:1;color:var(--c)}
+.card .total-l{font-size:12.5px;color:var(--muted)}
+.kv{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.kv div{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.kv span:first-child{color:var(--muted)}
+.kv span:last-child{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+
+.bars{display:flex;flex-direction:column;gap:14px}
+.bar-row{display:grid;grid-template-columns:150px minmax(0,1fr) 110px;gap:12px;align-items:center}
+@media (max-width:560px){.bar-row{grid-template-columns:minmax(0,1fr) auto}.bar-row .track{grid-column:1 / -1;order:3}}
+.bar-row .lbl{font-weight:600;font-size:14px}
+.bar-row .val{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.track{height:26px;background:var(--sunk);border-radius:3px;display:flex;overflow:hidden}
+.seg{height:100%;transition:width .35s ease}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+.chart-box{overflow-x:auto}
+svg text{font-family:var(--body);fill:var(--muted);font-size:12px}
+.note{font-size:13px;color:var(--muted)}
+
+.econ{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.econ{grid-template-columns:minmax(0,1fr)}}
+.econ .cell{background:var(--sunk);border-radius:4px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.econ .cell b{font-family:var(--display);font-size:28px;font-weight:700;line-height:1.05}
+.econ .cell span{font-size:13px;color:var(--muted)}
+.meter{height:12px;background:var(--sunk);border-radius:3px;overflow:hidden;position:relative}
+.meter i{position:absolute;left:0;top:0;bottom:0;background:var(--sc);transition:width .35s ease}
+
+.phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:800px){.phases{grid-template-columns:minmax(0,1fr)}}
+.phase{border:1px solid var(--line);border-radius:4px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.phase .when{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);background:var(--accent);align-self:flex-start;padding:4px 8px;border-radius:3px;font-weight:700}
+.phase ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.legal{border-left:4px solid var(--sa);background:var(--surface);border-radius:4px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.legal p{font-size:14.5px;max-width:75ch}
+.prem{font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px;padding-left:18px;margin:0}
+@media (prefers-reduced-motion: reduce){.seg,.meter i{transition:none}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Truck Center ABC · Diretoria · Simulação</p>
+    <h1>Mudança para Mauá: quanto custa perder o operacional</h1>
+    <div class="route">
+      <b>Matriz Rudge Ramos</b><span>São Bernardo do Campo</span>
+      <span class="arrow">→</span>
+      <b>Hub Mauá</b><span>Av. Papa João XXIII, 2199</span>
+    </div>
+  </header>
+
+  <section class="thesis" aria-live="polite">
+    <p class="big" id="thesis"></p>
+    <div class="chips">
+      <button class="btn ghost" id="reset">Voltar aos valores iniciais</button>
+      <button class="btn ghost only-m" id="go-adjust">Ajustar números ↓</button>
+    </div>
+  </section>
+
+  <div class="main">
+    <aside class="panel controls" id="controls" aria-label="Valores da simulação">
+      <div>
+        <h2>Ajuste os números</h2>
+        <p class="note" style="margin-top:4px">Todo valor aqui pode ser corrigido. O painel recalcula na hora.</p>
+      </div>
+
+      <details class="group" open>
+        <summary><h3>Empresa</h3></summary>
+        <div class="fields" id="g-empresa"></div>
+      </details>
+      <details class="group" open>
+        <summary><h3>Pessoas</h3></summary>
+        <div class="fields" id="g-pessoas"></div>
+      </details>
+      <details class="group" open>
+        <summary><h3>Transporte</h3></summary>
+        <div class="fields" id="g-transp"></div>
+      </details>
+      <details class="group">
+        <summary><h3>Reposição de mecânico</h3></summary>
+        <div class="fields" id="g-repo"></div>
+      </details>
+      <div class="field">
+        <div class="row"><label>Período analisado</label></div>
+        <div class="chips" role="group" aria-label="Período">
+          <button class="btn" data-h="6">6 meses</button>
+          <button class="btn" data-h="12">12 meses</button>
+          <button class="btn" data-h="18">18 meses</button>
+          <button class="btn" data-h="24">24 meses</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="results">
+      <div class="panel play">
+        <div>
+          <h2>Teste agora</h2>
+          <p class="note" style="margin-top:4px">Escolha um cenário ou mexa nas barras. Os cards abaixo mudam na hora e dizem se cada caminho fica bom, médio ou ruim, e por quê.</p>
+        </div>
+        <div class="chips" role="group" aria-label="Cenários prontos">
+          <button class="btn" data-preset="otimista" aria-pressed="false">Otimista: poucos saem</button>
+          <button class="btn" data-preset="provavel" aria-pressed="true">Provável</button>
+          <button class="btn" data-preset="pessimista" aria-pressed="false">Pessimista: muitos saem</button>
+        </div>
+        <div class="levers" id="levers"></div>
+      </div>
+
+      <div>
+        <h2>Os três caminhos</h2>
+        <p class="note" style="margin-top:4px" id="cards-sub"></p>
+      </div>
+      <div class="cards" id="cards"></div>
+
+      <div class="panel">
+        <div>
+          <h2>Impacto no resultado, lado a lado</h2>
+          <p class="note" style="margin-top:4px">Soma do que sai do caixa (transporte, encerramento de contratos, contratações) com o lucro que deixa de entrar porque a oficina produz menos.</p>
+        </div>
+        <div class="bars" id="bars"></div>
+        <div class="legend">
+          <span><i style="background:var(--ink);opacity:.85"></i>Transporte</span>
+          <span><i style="background:var(--muted);opacity:.55"></i>Encerramento + contratação</span>
+          <span><i style="background:var(--bad)"></i>Lucro perdido (oficina parada)</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div>
+          <h2>De onde sai o dinheiro do transporte</h2>
+          <p class="note" style="margin-top:4px">Saindo da matriz, a empresa deixa de pagar esse custo todo mês. O transporte é uma parte pequena dessa economia, redirecionada.</p>
+        </div>
+        <div class="econ" id="econ"></div>
+        <div>
+          <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+          <p class="note" style="margin-top:6px" id="meter-txt"></p>
+        </div>
+      </div>
+
+      <div>
+        <h2>Plano de transição proposto</h2>
+      </div>
+      <div class="phases">
+        <div class="phase">
+          <span class="when">Antes da mudança</span>
+          <h3>Saber quem vai</h3>
+          <ul>
+            <li>Mapear onde cada operacional mora (SBC, Santo André, outras)</li>
+            <li>Conversa individual com quem disse que não vai</li>
+            <li>Cotar 3 fretadoras de van e o custo da ajuda de condução</li>
+          </ul>
+        </div>
+        <div class="phase">
+          <span class="when">Primeiros meses em Mauá</span>
+          <h3>Manter a oficina rodando</h3>
+          <ul>
+            <li>Van ou ajuda de custo para quem mora longe</li>
+            <li>Pago com parte do que deixou de gastar na matriz</li>
+            <li>Acompanhar produtividade por mecânico todo mês</li>
+          </ul>
+        </div>
+        <div class="phase">
+          <span class="when">Depois de firmado</span>
+          <h3>Renovar com calma</h3>
+          <ul>
+            <li>Contratar gente de Mauá e região aos poucos</li>
+            <li>Substituir quem mora longe sem parar a produção</li>
+            <li>Reduzir as rotas de van conforme o quadro muda</li>
+          </ul>
+        </div>
+      </div>
+
+
+      <div class="panel">
+        <h3>Premissas do cálculo</h3>
+        <ul class="prem">
+          <li>O faturamento acompanha a mão de obra: se 10% dos operacionais faltam, a oficina produz 10% a menos.</li>
+          <li>Na prática a perda pode ser maior: a saída de um especialista (retífica, eletricista) pode travar um setor inteiro.</li>
+          <li>Custo de encerrar contrato, de contratar e preço da van são estimativas. Trocar pelos valores reais dos contratos PJ e das cotações.</li>
+          <li>A economia da matriz vale para os três caminhos, porque a mudança acontece em todos. O que muda é quanto da operação chega inteira em Mauá.</li>
+          <li>Os valores que você ajustar ficam salvos só neste aparelho.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+  <nav class="dock" id="dock" aria-label="Resumo do impacto"></nav>
+</div>
+
+<script>
+(function(){
+  const DEF = {custo:400000,fat:1800000,margem:30,total:75,oper:50,risco:20,apoio:35,
+    deslig:0,contrat:2500,repor:2,aprend:3,novato:60,ajuda:300,retAjuda:60,van:11000,lugares:15,retVan:90,h:12};
+  const PRESETS = {otimista:{risco:10},provavel:{risco:20},pessimista:{risco:32}};
+
+  const FIELDS = [
+    {g:'g-empresa',k:'custo',l:'Custo mensal da matriz',h:'Aluguel e despesas do galpão de Rudge Ramos que deixam de existir',min:50000,max:800000,step:10000,money:true,
+      quick:[{v:200000,t:'200 mil'},{v:300000,t:'300 mil'},{v:400000,t:'400 mil'},{v:500000,t:'500 mil'}]},
+    {g:'g-empresa',k:'fat',l:'Faturamento mensal',h:'Metas gerais da empresa (SBC + Mauá)',min:500000,max:3500000,step:50000,money:true,
+      quick:[{v:1800000,t:'1ª meta · 1,8 mi'},{v:2200000,t:'2ª meta · 2,2 mi'},{v:2500000,t:'3ª meta · 2,5 mi'}]},
+    {g:'g-empresa',k:'margem',l:'Margem de lucro',h:'Quanto de cada real faturado vira resultado',min:5,max:60,step:1,unit:'%',
+      ex:'<p>Margem de lucro é quanto sobra de verdade de cada R$ 100 faturados, depois de pagar todos os custos.</p>'+
+        '<p class="ex-t">Exemplo: uma OS de R$ 10.000</p>'+
+        '<div class="ex-tab">'+
+          '<div><span>Valor da OS</span><span>R$ 10.000</span></div>'+
+          '<div class="minus"><span>Peças</span><span>− R$ 4.000</span></div>'+
+          '<div class="minus"><span>Mecânico (pagamento e comissão)</span><span>− R$ 2.000</span></div>'+
+          '<div class="minus"><span>Aluguel, luz, administrativo</span><span>− R$ 1.000</span></div>'+
+          '<div class="sum"><span>Sobra para a empresa</span><span>R$ 3.000</span></div>'+
+        '</div>'+
+        '<p>R$ 3.000 de R$ 10.000 = <strong>30% de margem</strong>.</p>'+
+        '<p class="ex-t">Por que o painel usa a margem</p>'+
+        '<p>Se a oficina deixa de fazer essa OS, ela não perde os R$ 10.000 inteiros, porque também não compra as peças. O que ela perde de verdade são os R$ 3.000 que sobrariam.</p>'+
+        '<p class="ex-f">Faturamento perdido × margem = lucro perdido</p>'+
+        '<p class="ex-t">O número é conservador</p>'+
+        '<p>Quando um mecânico sai, o aluguel e o administrativo continuam sendo pagos. Então a perda real tende a ser maior que a margem. Usar a margem evita qualquer exagero na conta.</p>'},
+    {g:'g-empresa',k:'total',l:'Total de funcionários',min:20,max:150,step:1,unit:'pessoas'},
+    {g:'g-empresa',k:'oper',l:'Operacionais',h:'Mecânicos, ajudantes, eletricistas, funileiros',min:5,max:150,step:1,unit:'pessoas'},
+    {g:'g-pessoas',k:'risco',l:'Operacionais que não iriam sem apoio',h:'Quantos sairiam se for "quem quiser vai"',min:0,max:150,step:1,unit:'pessoas'},
+    {g:'g-pessoas',k:'apoio',l:'Pessoas que precisam de transporte',h:'Quem mora longe de Mauá (SBC, Santo André etc.)',min:0,max:150,step:1,unit:'pessoas'},
+    {g:'g-pessoas',k:'deslig',l:'Custo de encerrar 1 contrato',h:'Multa ou aviso previsto no contrato PJ, se houver',min:0,max:40000,step:500,money:true},
+    {g:'g-pessoas',k:'contrat',l:'Custo de contratar 1 pessoa',h:'Anúncio, integração, uniforme, ferramentas',min:0,max:15000,step:500,money:true},
+    {g:'g-transp',k:'ajuda',l:'Ajuda de custo por pessoa',h:'Diferença de passagem por mês, somada ao contrato PJ',min:0,max:1500,step:10,money:true},
+    {g:'g-transp',k:'retAjuda',l:'Ficam com ajuda de custo',h:'Dos que não iriam: o ônibus ainda pesa',min:0,max:100,step:5,unit:'%'},
+    {g:'g-transp',k:'van',l:'Custo de 1 van por mês',h:'Fretada, ida e volta, com motorista (cotar)',min:3000,max:30000,step:500,money:true},
+    {g:'g-transp',k:'lugares',l:'Lugares por van',min:8,max:20,step:1,unit:'lugares'},
+    {g:'g-transp',k:'retVan',l:'Ficam com van',h:'Dos que não iriam: van busca perto de casa',min:0,max:100,step:5,unit:'%'},
+    {g:'g-repo',k:'repor',l:'Meses até contratar substituto',h:'Vaga parada enquanto procura mecânico',min:0,max:12,step:1,unit:'meses'},
+    {g:'g-repo',k:'aprend',l:'Meses até o novato render 100%',min:0,max:12,step:1,unit:'meses'},
+    {g:'g-repo',k:'novato',l:'Produtividade do novato',h:'Enquanto aprende o jeito da casa',min:10,max:100,step:5,unit:'%'}
+  ];
+
+  let P = Object.assign({}, DEF);
+  try{ const s = JSON.parse(localStorage.getItem('sim-maua-v2')||'null'); if(s) Object.assign(P, s); }catch(e){}
+
+  const brl = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+  const intf = new Intl.NumberFormat('pt-BR');
+  function compact(v){
+    const a=Math.abs(v);
+    if(a>=1e6) return 'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi';
+    if(a>=1e3) return 'R$ '+Math.round(v/1e3).toLocaleString('pt-BR')+' mil';
+    return brl.format(v);
+  }
+
+  // controles
+  FIELDS.forEach(f=>{
+    const box=document.getElementById(f.g);
+    const id='f-'+f.k;
+    const el=document.createElement('div'); el.className='field';
+    el.innerHTML='<div class="row"><label for="'+id+'">'+f.l+'</label><span class="unit">'+(f.money?'R$':(f.unit||''))+'</span></div>'+
+      (f.h?'<p class="hint">'+f.h+'</p>':'')+
+      (f.ex?'<details class="explain"><summary>Entenda com um exemplo</summary><div class="explain-body">'+f.ex+'</div></details>':'')+
+      '<div class="ctl"><input type="range" id="'+id+'-r" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'" aria-label="'+f.l+'">'+
+      '<input type="text" id="'+id+'" inputmode="numeric" autocomplete="off"></div>'+
+      (f.quick?'<div class="quick" role="group" aria-label="Valores rápidos">'+f.quick.map(q=>'<button type="button" data-k="'+f.k+'" data-v="'+q.v+'">'+q.t+'</button>').join('')+'</div>':'');
+    box.appendChild(el);
+    const r=el.querySelector('input[type=range]'), n=el.querySelector('input[type=text]');
+    r.addEventListener('input',()=>{P[f.k]=+r.value; sync(); render(); clearPreset();});
+    n.addEventListener('input',()=>{ const v=n.value.replace(/\D/g,''); if(v==='') return; P[f.k]=+v; sync(true); render(); clearPreset();});
+    n.addEventListener('blur',()=>sync());
+    el.querySelectorAll('.quick button').forEach(q=>q.addEventListener('click',()=>{P[f.k]=+q.dataset.v; sync(); render();}));
+  });
+
+  function sync(skipNumber){
+    P.oper=Math.min(P.oper,P.total);
+    P.risco=Math.min(P.risco,P.oper);
+    P.apoio=Math.min(P.apoio,P.total);
+    P.lugares=Math.max(1,P.lugares);
+    FIELDS.forEach(f=>{
+      const r=document.getElementById('f-'+f.k+'-r'), n=document.getElementById('f-'+f.k);
+      r.value=P[f.k];
+      if(!skipNumber || document.activeElement!==n) n.value=intf.format(P[f.k]);
+    });
+    document.querySelectorAll('.quick button').forEach(q=>q.setAttribute('aria-pressed', P[q.dataset.k]===+q.dataset.v?'true':'false'));
+    LEVERS.forEach(k=>{
+      const f=FIELDS.find(x=>x.k===k), r=document.getElementById('lv-'+k);
+      r.max = k==='risco'?P.oper:(k==='apoio'?P.total:f.max);
+      r.value=P[k];
+      document.getElementById('lv-'+k+'-o').textContent = f.money?compact(P[k]):(k==='risco'?P[k]+' de '+P.oper:P[k]+' pessoas');
+    });
+    document.querySelectorAll('[data-h]').forEach(b=>b.setAttribute('aria-pressed', +b.dataset.h===P.h?'true':'false'));
+    try{ localStorage.setItem('sim-maua-v2', JSON.stringify(P)); }catch(e){}
+  }
+
+  // alavancas do "Teste agora"
+  const LEVERS=['risco','apoio','van'];
+  const LEVER_LABEL={risco:'Operacionais que não iriam sem apoio',apoio:'Pessoas que precisam de transporte',van:'Custo de 1 van por mês'};
+  LEVERS.forEach(k=>{
+    const f=FIELDS.find(x=>x.k===k);
+    const el=document.createElement('div'); el.className='lever';
+    el.innerHTML='<div class="top-l"><label for="lv-'+k+'">'+LEVER_LABEL[k]+'</label><output id="lv-'+k+'-o"></output></div>'+
+      '<div class="lever-row"><button type="button" class="step" data-d="-1" aria-label="Diminuir">−</button>'+
+      '<input type="range" id="lv-'+k+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'">'+
+      '<button type="button" class="step" data-d="1" aria-label="Aumentar">+</button></div>';
+    document.getElementById('levers').appendChild(el);
+    const r=el.querySelector('input');
+    r.addEventListener('input',()=>{P[k]=+r.value; sync(); render(); clearPreset();});
+    el.querySelectorAll('.step').forEach(b=>b.addEventListener('click',()=>{
+      P[k]=Math.max(f.min, Math.min(+r.max, P[k] + (+b.dataset.d)*f.step)); sync(); render(); clearPreset();
+    }));
+  });
+
+  function clearPreset(){
+    document.querySelectorAll('[data-preset]').forEach(b=>{
+      b.setAttribute('aria-pressed', PRESETS[b.dataset.preset].risco===P.risco?'true':'false');
+    });
+  }
+
+  // cálculo
+  function sim(){
+    const vans=Math.ceil(P.apoio/P.lugares);
+    const defs=[
+      {id:'a',nome:'Quem quiser vai',desc:'Sem apoio de transporte',c:'var(--sa)',ret:0,trans:0,tdesc:'Nenhum'},
+      {id:'b',nome:'Ajuda de custo',desc:'Acréscimo no contrato de quem mora longe',c:'var(--sb)',ret:P.retAjuda/100,trans:P.apoio*P.ajuda,tdesc:P.apoio+' × '+brl.format(P.ajuda)},
+      {id:'c',nome:'Van fretada',desc:'Busca em SBC e Santo André',c:'var(--sc)',ret:P.retVan/100,trans:vans*P.van,tdesc:vans+(vans===1?' van':' vans')+' × '+compact(P.van)}
+    ];
+    return defs.map(s=>{
+      const saem=Math.round(P.risco*(1-s.ret));
+      const share=P.oper?saem/P.oper:0;
+      const caps=[1]; let perdaFat=0;
+      for(let m=1;m<=P.h;m++){
+        const cv = m<=P.repor?0:(m<=P.repor+P.aprend?P.novato/100:1);
+        const cap=1-share*(1-cv);
+        caps.push(cap); perdaFat+=P.fat*(1-cap);
+      }
+      const unicos=saem*(P.deslig+P.contrat);
+      const transTot=s.trans*P.h;
+      const lucro=perdaFat*P.margem/100;
+      return Object.assign(s,{saem,share,caps,perdaFat,unicos,transTot,lucro,impacto:transTot+unicos+lucro,fat1:P.fat*share});
+    });
+  }
+
+  const prevV={};
+  function transPct(s){ return P.custo? s.trans/P.custo : (s.trans?9:0); }
+
+  // pontos: capacidade que sobra + custo comparado ao melhor + peso do transporte na economia da matriz
+  function verdict(s,best){
+    let pts=0;
+    const sh=s.share;
+    pts += sh<0.05?2:(sh<0.10?1:(sh<0.20?0:-2));
+    const ratio = best.impacto<=0 ? (s.impacto<=0?1:9) : s.impacto/best.impacto;
+    pts += ratio<=1.15?2:(ratio<=1.4?1:(ratio<=2?0:-1));
+    const tp=transPct(s);
+    pts += tp<=0.10?1:(tp<=0.25?0:(tp<=1?-1:-2));
+    return pts>=4?'bom':(pts>=2?'medio':'ruim');
+  }
+
+  function reasons(s,best){
+    const R=[], pct=Math.round(s.share*100);
+    if(s.saem===0) R.push({p:1,t:'Ninguém sai: a oficina chega inteira em Mauá'});
+    else if(s.share<0.10) R.push({p:1,t:'Só '+s.saem+' '+(s.saem===1?'operacional sai':'operacionais saem')+' ('+pct+'%): a produção quase não sente'});
+    else R.push({p:0,t:s.saem+' operacionais saem e a oficina perde '+pct+'% da capacidade'});
+    if(s.perdaFat>0) R.push({p:0,t:'Deixa de faturar '+compact(s.perdaFat)+' até repor e treinar substitutos'});
+    if(s.unicos>0) R.push({p:0,t:compact(s.unicos)+' para '+(P.deslig>0?'encerrar contratos e ':'')+'contratar substitutos'});
+    if(!s.trans) R.push({p:1,t:'Nenhum gasto com transporte'});
+    else {
+      const tp=Math.round(transPct(s)*100);
+      if(tp<=10) R.push({p:1,t:'Transporte de '+compact(s.trans)+'/mês usa só '+tp+'% da economia com a matriz'});
+      else if(tp<=100) R.push({p:0,t:'Transporte de '+compact(s.trans)+'/mês usa '+tp+'% da economia com a matriz'});
+      else R.push({p:0,t:'Transporte de '+compact(s.trans)+'/mês custa mais que a economia com a matriz'});
+    }
+    if(s===best) R.push({p:1,t:'Menor impacto total entre os três caminhos'});
+    else R.push({p:0,t:'Custa '+compact(s.impacto-best.impacto)+' a mais que '+best.nome.toLowerCase()});
+    if(s.id==='a' && s.saem>0) R.push({p:0,t:'Quem vai ou não fica na mão de cada um: não dá para planejar a escala'});
+    if(s.id==='b'){
+      R.push({p:1,t:'Simples de aplicar e fácil de cortar depois'});
+      if(P.retAjuda<80 && P.risco>0) R.push({p:0,t:'Quem depende de ônibus pode desistir mesmo com a ajuda'});
+    }
+    if(s.id==='c' && P.apoio>0){
+      R.push({p:1,t:'Busca perto de casa: resolve o problema do ônibus'});
+      const vans=Math.ceil(P.apoio/P.lugares), last=P.apoio-(vans-1)*P.lugares;
+      if(last<P.lugares*0.5) R.push({p:0,t:'A última van roda com só '+last+' de '+P.lugares+' lugares'});
+      else R.push({p:1,t:vans+(vans===1?' van bem ocupada':' vans bem ocupadas')+': bom aproveitamento'});
+    }
+    return R;
+  }
+
+  function render(){
+    const S=sim();
+    const [A,B,C]=S;
+    const sorted=[...S].sort((x,y)=>x.impacto-y.impacto);
+    const best=sorted[0], worst=sorted[2];
+    const altBest=[B,C].sort((x,y)=>x.impacto-y.impacto)[0];
+    const pct=Math.round(A.share*100);
+
+    // tese
+    let t;
+    if(A.saem===0){
+      t='Com os números atuais, ninguém deixaria de ir para Mauá. Ajuste quantos operacionais <strong>não iriam sem apoio</strong> para ver o risco.';
+    } else {
+      const economia=altBest.trans? Math.round(altBest.trans/P.custo*100):0;
+      t='Se <strong class="hl-a">'+A.saem+' dos '+P.oper+' operacionais</strong> não forem para Mauá, a oficina perde <strong class="hl-a">'+pct+'% da capacidade</strong> e deixa de faturar <strong class="hl-a">'+compact(A.perdaFat)+'</strong> em '+P.h+' meses. '+
+        'Com <strong class="hl-c">'+altBest.nome.toLowerCase()+'</strong>, o impacto cai para <strong class="hl-c">'+compact(altBest.impacto)+'</strong>, e o transporte custa <strong>'+compact(altBest.trans)+' por mês</strong>, '+
+        (economia<=100?'cerca de '+economia+'% do que a empresa deixa de gastar com a matriz.':'mais do que a economia mensal com a matriz.');
+    }
+    document.getElementById('thesis').innerHTML=t;
+    document.getElementById('cards-sub').textContent='Resultado em '+P.h+' meses. O impacto soma transporte, encerramento de contratos, contratações e o lucro perdido com a oficina produzindo menos.';
+
+    // veredito e motivos
+    S.forEach(s=>{ s.v=verdict(s,best); s.why=reasons(s,best); });
+
+    // cards
+    const VTXT={bom:'Bom',medio:'Médio',ruim:'Ruim'};
+    document.getElementById('cards').innerHTML=S.map(s=>{
+      const flash = prevV[s.id] && prevV[s.id]!==s.v ? ' flash':'';
+      return '<article class="card'+flash+'" style="--c:'+s.c+'">'+
+        '<div class="head"><div><h3>'+s.nome+'</h3><p>'+s.desc+'</p></div><span class="verdict v-'+s.v+'">'+VTXT[s.v]+'</span></div>'+
+        '<div><div class="total num">'+compact(s.impacto)+'</div><div class="total-l">impacto no resultado em '+P.h+' meses</div></div>'+
+        '<ul class="reasons">'+s.why.map(r=>'<li><i class="ic '+(r.p?'pos':'neg')+'" aria-label="'+(r.p?'Ponto positivo':'Ponto negativo')+'">'+(r.p?'+':'−')+'</i><span>'+r.t+'</span></li>').join('')+'</ul>'+
+        '<div class="kv">'+
+          '<div><span>Operacionais que saem</span><span>'+s.saem+' ('+Math.round(s.share*100)+'%)</span></div>'+
+          '<div><span>Faturamento perdido</span><span>'+compact(s.perdaFat)+'</span></div>'+
+          '<div><span>Lucro perdido</span><span>'+compact(s.lucro)+'</span></div>'+
+          '<div><span>Encerramento + contratação</span><span>'+compact(s.unicos)+'</span></div>'+
+          '<div><span>Transporte por mês</span><span>'+(s.trans?compact(s.trans):'R$ 0')+'</span></div>'+
+          '<div><span>Transporte no período</span><span>'+compact(s.transTot)+'</span></div>'+
+        '</div></article>';
+    }).join('');
+
+    // barras
+    const max=Math.max(...S.map(s=>s.impacto),1);
+    document.getElementById('bars').innerHTML=S.map(s=>{
+      const w=v=>(v/max*100).toFixed(2)+'%';
+      return '<div class="bar-row"><span class="lbl" style="color:'+s.c+'">'+s.nome+'</span>'+
+        '<div class="track" role="img" aria-label="'+s.nome+': '+compact(s.impacto)+'">'+
+        '<span class="seg" style="width:'+w(s.transTot)+';background:var(--ink);opacity:.85"></span>'+
+        '<span class="seg" style="width:'+w(s.unicos)+';background:var(--muted);opacity:.55"></span>'+
+        '<span class="seg" style="width:'+w(s.lucro)+';background:var(--bad)"></span></div>'+
+        '<span class="val">'+compact(s.impacto)+'</span></div>';
+    }).join('');
+
+
+    document.getElementById('dock').innerHTML=S.map(s=>
+      '<div class="d" style="--c:'+s.c+'"><span>'+s.nome+'</span><b>'+compact(s.impacto)+'</b><em style="color:var(--'+(s.v==='bom'?'good':(s.v==='medio'?'warn':'bad'))+')">'+VTXT[s.v]+'</em></div>').join('');
+    S.forEach(s=>prevV[s.id]=s.v);
+
+    // economia
+    document.getElementById('econ').innerHTML=
+      '<div class="cell"><span>Economia com a matriz</span><b class="num">'+compact(P.custo)+'</b><span>por mês</span></div>'+
+      '<div class="cell"><span>Ajuda de custo</span><b class="num" style="color:var(--sb)">'+compact(B.trans)+'</b><span>por mês · '+B.tdesc+'</span></div>'+
+      '<div class="cell"><span>Van fretada</span><b class="num" style="color:var(--sc)">'+compact(C.trans)+'</b><span>por mês · '+C.tdesc+'</span></div>';
+    const vp=P.custo?C.trans/P.custo*100:0;
+    document.getElementById('meter').style.width=Math.min(100,vp).toFixed(1)+'%';
+    const sobra=P.custo-C.trans;
+    document.getElementById('meter-txt').textContent= vp<=100
+      ? 'A van usa '+vp.toFixed(1).replace('.',',')+'% da economia mensal com a matriz. Sobram '+compact(sobra)+' por mês.'
+      : 'A van custaria mais do que a economia com a matriz. Revise os valores.';
+  }
+
+  function drawChart(S){
+    const box=document.getElementById('chart');
+    const W=Math.max(box.clientWidth,320), H=240, ml=44, mr=14, mt=12, mb=30;
+    const pw=W-ml-mr, ph=H-mt-mb;
+    const minCap=Math.min(...S.flatMap(s=>s.caps));
+    let lo=Math.floor(minCap*10)/10; if(lo>0.9) lo=0.9; lo=Math.max(0,lo-0.0);
+    const n=P.h;
+    const x=i=>ml+pw*i/n, y=v=>mt+ph*(1-(v-lo)/(1-lo));
+    let g='';
+    const steps=Math.round((1-lo)/0.1);
+    for(let k=0;k<=steps;k++){
+      const v=lo+k*0.1, yy=y(v).toFixed(1);
+      g+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+yy+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'+
+         '<text x="'+(ml-8)+'" y="'+(+yy+4)+'" text-anchor="end">'+Math.round(v*100)+'%</text>';
+    }
+    const every=n<=12?1:(n<=18?2:3);
+    for(let i=0;i<=n;i+=every){
+      g+='<text x="'+x(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+(i===0?'Hoje':'M'+i)+'</text>';
+    }
+    const order=[S[2],S[1],S[0]];
+    order.forEach(s=>{
+      const pts=s.caps.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ');
+      g+='<polyline points="'+pts+'" fill="none" stroke="'+s.c+'" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>';
+      const last=s.caps.length-1;
+      const lowI=s.caps.indexOf(Math.min(...s.caps));
+      g+='<circle cx="'+x(lowI).toFixed(1)+'" cy="'+y(s.caps[lowI]).toFixed(1)+'" r="4.5" fill="'+s.c+'" stroke="var(--surface)" stroke-width="2"/>';
+      g+='<circle cx="'+x(last).toFixed(1)+'" cy="'+y(s.caps[last]).toFixed(1)+'" r="3.5" fill="'+s.c+'"/>';
+    });
+    box.innerHTML='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Capacidade da oficina por mês nos três caminhos">'+g+'</svg>';
+  }
+
+  document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click',()=>{
+    Object.assign(P,PRESETS[b.dataset.preset]); sync(); render(); clearPreset();
+  }));
+  document.querySelectorAll('[data-h]').forEach(b=>b.addEventListener('click',()=>{P.h=+b.dataset.h; sync(); render();}));
+  document.getElementById('go-adjust').addEventListener('click',()=>document.getElementById('controls').scrollIntoView({behavior:'smooth',block:'start'}));
+  document.getElementById('reset').addEventListener('click',()=>{P=Object.assign({},DEF); sync(); render(); clearPreset();});
+  let rt; window.addEventListener('resize',()=>{clearTimeout(rt); rt=setTimeout(render,120);});
+
+  sync(); render(); clearPreset();
+})();
+</script>
+
+</body>
+</html>
